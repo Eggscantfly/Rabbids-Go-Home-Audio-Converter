@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+    <ApplicationIcon>Contents\icon.ico</ApplicationIcon>
+    <AssemblyName>RGHAudioConverter</AssemblyName>
+    <RootNamespace>RGHAudioConverter</RootNamespace>
+    <Version>1.0.0</Version>
+    <Authors>Niko</Authors>
+    <Description>Rabbids Go Home Audio Converter - Convert WAV to LyN SNS format</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Include image files to output -->
+    <None Update="Contents\Gui\**\*.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Contents\icon.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <!-- Include font file to output -->
+    <None Update="Contents\Font\*.ttf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

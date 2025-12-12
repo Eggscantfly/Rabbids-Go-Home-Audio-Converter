@@ -1,0 +1,292 @@
+<Window x:Class="RGHAudioConverter.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Rabbids Go Home Audio Converter"
+        Height="600" Width="800"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize"
+        Background="#FF808080">
+    
+    <Window.Resources>
+        
+        <!-- Button Style -->
+        <Style x:Key="PlatformButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="#CCCCCC"/>
+            <Setter Property="BorderThickness" Value="3"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border" 
+                                Background="{TemplateBinding Background}" 
+                                BorderBrush="{TemplateBinding BorderBrush}" 
+                                BorderThickness="{TemplateBinding BorderThickness}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="BorderBrush" Value="White"/>
+                                <Setter TargetName="border" Property="Background" Value="#20FFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#40FFFFFF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        
+        <!-- OK Button Style -->
+        <Style x:Key="OkButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="Black"/>
+            <Setter Property="BorderThickness" Value="2"/>
+            <Setter Property="FontSize" Value="18"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Padding" Value="30,5"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border" 
+                                Background="{TemplateBinding Background}" 
+                                BorderBrush="{TemplateBinding BorderBrush}" 
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#EEEEEE"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#DDDDDD"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+    
+    <Grid>
+        <!-- Main Content -->
+        <Grid x:Name="MainContent">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            
+            <!-- Logo at top -->
+            <Image x:Name="LogoImage" 
+                   Grid.Row="0"
+                   Height="200"
+                   Margin="0,40,0,20"
+                   RenderOptions.BitmapScalingMode="HighQuality"/>
+            
+            <!-- Platform Selection Buttons -->
+            <Grid Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="250"/>
+                    <ColumnDefinition Width="80"/>
+                    <ColumnDefinition Width="250"/>
+                </Grid.ColumnDefinitions>
+                
+                <!-- Wii/NGC Button (DSP) -->
+                <Button x:Name="NgcButton" 
+                        Grid.Column="0"
+                        Style="{StaticResource PlatformButtonStyle}"
+                        Width="220" Height="180"
+                        Click="NgcButton_Click"
+                        ToolTip="Nintendo GameCube/Wii - DSP ADPCM">
+                    <Image x:Name="NgcImage"
+                           Stretch="Uniform" 
+                           Margin="10"
+                           RenderOptions.BitmapScalingMode="HighQuality"/>
+                </Button>
+                
+                <!-- OGG/PC Button -->
+                <Button x:Name="OggButton" 
+                        Grid.Column="2"
+                        Style="{StaticResource PlatformButtonStyle}"
+                        Width="220" Height="180"
+                        Click="OggButton_Click"
+                        ToolTip="PC - OGG Vorbis">
+                    <Image x:Name="OggImage"
+                           Stretch="Uniform" 
+                           Margin="10"
+                           RenderOptions.BitmapScalingMode="HighQuality"/>
+                </Button>
+            </Grid>
+            
+            <!-- Bottom area with status and debug checkbox -->
+            <Grid Grid.Row="2" Margin="0,0,0,15">
+                <!-- Credits Button (bottom left) -->
+                <Button x:Name="CreditsButton"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Center"
+                        Margin="20,0,0,0"
+                        Padding="10,5"
+                        Background="Transparent"
+                        Foreground="White"
+                        BorderBrush="White"
+                        BorderThickness="1"
+                        Content="Credits"
+                        FontSize="12"
+                        Cursor="Hand"
+                        Click="CreditsButton_Click"/>
+                
+                <!-- Status Text (centered) -->
+                <TextBlock x:Name="StatusText"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           FontSize="20"
+                           Foreground="White"
+                           Text=""/>
+                
+                <!-- Debug Terminal Checkbox (bottom right) -->
+                <CheckBox x:Name="DebugCheckbox"
+                          HorizontalAlignment="Right"
+                          VerticalAlignment="Center"
+                          Margin="0,0,20,0"
+                          Foreground="White"
+                          Content="Debug Terminal"
+                          FontSize="12"/>
+            </Grid>
+        </Grid>
+        
+        <!-- Result Dialog Overlay (Hidden by default) - Smaller popup style -->
+        <Grid x:Name="ResultOverlay" Visibility="Collapsed">
+            <!-- Semi-transparent background -->
+            <Rectangle Fill="#80000000"/>
+            
+            <!-- Popup box -->
+            <Border Background="White" 
+                    BorderBrush="Black" 
+                    BorderThickness="3"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    CornerRadius="5"
+                    MinWidth="450"
+                    MinHeight="180"
+                    MaxWidth="500">
+                <Grid Margin="15">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="130"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    
+                    <!-- Rabbid Face -->
+                    <Image x:Name="RabbidImage"
+                           Grid.Column="0"
+                           Grid.Row="0"
+                           Width="110"
+                           Height="110"
+                           Margin="5"
+                           VerticalAlignment="Center"
+                           HorizontalAlignment="Center"
+                           RenderOptions.BitmapScalingMode="HighQuality"/>
+                    
+                    <!-- Result Message -->
+                    <TextBlock x:Name="ResultMessage"
+                               Grid.Column="1"
+                               Grid.Row="0"
+                               VerticalAlignment="Center"
+                               HorizontalAlignment="Left"
+                               FontSize="24"
+                               FontWeight="Bold"
+                               TextWrapping="Wrap"
+                               Margin="10,0,0,0"/>
+                    
+                    <!-- OK Button -->
+                    <Button x:Name="OkButton"
+                            Grid.Column="1"
+                            Grid.Row="1"
+                            Style="{StaticResource OkButtonStyle}"
+                            HorizontalAlignment="Right"
+                            Margin="0,10,0,0"
+                            Content="OK"
+                            Click="OkButton_Click"/>
+                </Grid>
+            </Border>
+        </Grid>
+        
+        <!-- Credits Overlay -->
+        <Grid x:Name="CreditsOverlay" Visibility="Collapsed">
+            <Rectangle Fill="#80000000" MouseDown="CreditsOverlay_MouseDown"/>
+            
+            <Border Background="White" 
+                    BorderBrush="Black" 
+                    BorderThickness="3"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    CornerRadius="5"
+                    Padding="25">
+                <StackPanel>
+                    <TextBlock x:Name="CreditsTitleText"
+                               Text="Credits"
+                               FontSize="28"
+                               FontWeight="Bold"
+                               HorizontalAlignment="Center"
+                               Margin="0,0,0,20"/>
+                    
+                    <TextBlock x:Name="MadeByText"
+                               Text="Made by"
+                               FontSize="14"
+                               Foreground="Gray"
+                               HorizontalAlignment="Center"/>
+                    <TextBlock x:Name="EggsLink"
+                               Text="Eggscantfly"
+                               FontSize="20"
+                               FontWeight="Bold"
+                               Foreground="Blue"
+                               TextDecorations="Underline"
+                               HorizontalAlignment="Center"
+                               Cursor="Hand"
+                               Margin="0,0,0,20"
+                               MouseDown="EggsLink_Click"/>
+                    
+                    <TextBlock x:Name="SpecialThanksText"
+                               Text="Special Thanks"
+                               FontSize="14"
+                               Foreground="Gray"
+                               HorizontalAlignment="Center"
+                               Margin="0,10,0,5"/>
+                    
+                    <TextBlock x:Name="SkibidiLink"
+                               Text="Skibidi_Sigma"
+                               FontSize="18"
+                               Foreground="Blue"
+                               TextDecorations="Underline"
+                               HorizontalAlignment="Center"
+                               Cursor="Hand"
+                               Margin="0,5,0,5"
+                               MouseDown="SkibidiLink_Click"/>
+                    
+                    <TextBlock x:Name="CruwbyLink"
+                               Text="Cruwby"
+                               FontSize="18"
+                               Foreground="Blue"
+                               TextDecorations="Underline"
+                               HorizontalAlignment="Center"
+                               Cursor="Hand"
+                               Margin="0,5,0,20"
+                               MouseDown="CruwbyLink_Click"/>
+                    
+                    <Button x:Name="CloseCreditsButton"
+                            Content="Close"
+                            Padding="20,8"
+                            HorizontalAlignment="Center"
+                            Click="CloseCredits_Click"/>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Grid>
+</Window>
