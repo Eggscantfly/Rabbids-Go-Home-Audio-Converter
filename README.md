@@ -14,7 +14,7 @@ This tool could possibly be used for other LyN Engine Titles e.g. (Rabbids Trave
 
 ## Downsides
 Sadly there's no way to generate a sns file that has the Label string with the beat markers in them yet...  
-If you want to replace a sns i.e. (**A Stereo sns with the Sample Rate of 32000hz**) Your custom audio has to have the same Sample Rate and the same amount of Channels as the sns you are trying to replace.
+If you want to replace a sns e.g. (**A Stereo sns with the Sample Rate of 32000hz**) Your custom audio has to have the same Sample Rate and the same amount of Channels as the sns you are trying to replace.
 
 ## Credits
 
