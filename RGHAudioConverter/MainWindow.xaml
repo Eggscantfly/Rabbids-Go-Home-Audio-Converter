@@ -124,22 +124,46 @@
             
             <!-- Bottom area with status and debug checkbox -->
             <Grid Grid.Row="2" Margin="0,0,0,15">
-                <!-- Credits Button (bottom left) -->
-                <Button x:Name="CreditsButton"
-                        HorizontalAlignment="Left"
-                        VerticalAlignment="Center"
-                        Margin="20,0,0,0"
-                        Padding="10,5"
-                        Background="Transparent"
-                        Foreground="White"
-                        BorderBrush="White"
-                        BorderThickness="1"
-                        Content="Credits"
-                        FontSize="12"
-                        Cursor="Hand"
-                        Click="CreditsButton_Click"/>
+                <!-- Credits Button and Options (bottom left) -->
+                <StackPanel Orientation="Horizontal"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Center"
+                            Margin="20,0,0,0">
+                    <Button x:Name="CreditsButton"
+                            Padding="10,5"
+                            Background="Transparent"
+                            Foreground="White"
+                            BorderBrush="White"
+                            BorderThickness="1"
+                            Content="Credits"
+                            FontSize="12"
+                            Cursor="Hand"
+                            Click="CreditsButton_Click"/>
+                    <CheckBox x:Name="MonoCheckbox"
+                              Foreground="White"
+                              Content="Mono"
+                              FontSize="12"
+                              VerticalAlignment="Center"
+                              Margin="15,0,0,0"/>
+                    <ComboBox x:Name="SampleRateCombo" 
+                              Width="70" 
+                              FontSize="11"
+                              SelectedIndex="4"
+                              Margin="10,0,0,0">
+                        <ComboBoxItem Content="8000"/>
+                        <ComboBoxItem Content="11025"/>
+                        <ComboBoxItem Content="16000"/>
+                        <ComboBoxItem Content="22050"/>
+                        <ComboBoxItem Content="32000"/>
+                    </ComboBox>
+                    <TextBlock Text="Hz" 
+                               Foreground="White" 
+                               FontSize="12" 
+                               VerticalAlignment="Center"
+                               Margin="5,0,0,0"/>
+                </StackPanel>
                 
-                <!-- Status Text (centered) -->
+                <!-- Status Text (center) -->
                 <TextBlock x:Name="StatusText"
                            HorizontalAlignment="Center"
                            VerticalAlignment="Center"
