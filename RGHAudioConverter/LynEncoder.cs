@@ -11,18 +11,17 @@ namespace RGHAudioConverter
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool AllocConsole();
 
-        // DSP Coefs From VGMstream
-
+        // DSP Coefs from VGMStream
         private static readonly short[] DSP_COEFS = 
         {
-            1195, -787,
-            1929, -289,
-            2466, -1307,
-            3216, -1343,
-            2125, -1372,
-            2434, -521,
-            2806, -1286,
-            3046, -1035
+            0x04ab, unchecked((short)0xfced),
+            0x0789, unchecked((short)0xfedf),
+            0x09a2, unchecked((short)0xfae5),
+            0x0c90, unchecked((short)0xfac1),
+            0x084d, unchecked((short)0xfaa4),
+            0x0982, unchecked((short)0xfdf7),
+            0x0af6, unchecked((short)0xfafa),
+            0x0be6, unchecked((short)0xfbf5)
         };
 
         public static bool ValidateWavFile(string path, out string error)
@@ -102,11 +101,11 @@ namespace RGHAudioConverter
                 if (debugMode)
                 {
                     AllocConsole();
-                    Console.WriteLine("=== RGH Audio Converter - DSP Encoding ===");
+                    Console.WriteLine("=== RGH Audio Converter - DSP ===");
                     Console.WriteLine($"Input: {inputPath}");
                     Console.WriteLine($"Output: {outputPath}");
-                    Console.WriteLine($"Target Sample Rate: {targetSampleRate}Hz");
-                    Console.WriteLine($"Force Mono: {forceMono}");
+                    Console.WriteLine($"Sample Rate: {targetSampleRate}Hz");
+                    Console.WriteLine($"Mono: {forceMono}");
                     Console.WriteLine();
                 }
 
@@ -114,7 +113,7 @@ namespace RGHAudioConverter
                 
                 string? ffmpegPath = FindExecutable("ffmpeg");
                 
-                // Check input sample rate and channels
+                // get input info
                 byte[] checkBytes = File.ReadAllBytes(inputPath);
                 int inputSampleRate = 0;
                 int inputChannels = 0;
@@ -140,7 +139,7 @@ namespace RGHAudioConverter
                 
                 if (needsProcessing && ffmpegPath != null)
                 {
-                    if (debugMode) Console.WriteLine($"[5%] Processing audio (resample/mono)...");
+                    if (debugMode) Console.WriteLine($"[5%] Resampling/converting...");
                     progressCallback?.Invoke(5);
                     
                     tempProcessedFile = Path.Combine(Path.GetTempPath(), $"rgh_process_{Guid.NewGuid():N}.wav");
@@ -155,19 +154,19 @@ namespace RGHAudioConverter
                     if (result == 0 && File.Exists(tempProcessedFile))
                     {
                         actualInputPath = tempProcessedFile;
-                        if (debugMode) Console.WriteLine($"  Processed successfully");
+                        if (debugMode) Console.WriteLine($"  Done");
                     }
                     else
                     {
-                        if (debugMode) Console.WriteLine($"  Warning: Processing failed, using original");
+                        if (debugMode) Console.WriteLine($"  Failed, using original");
                     }
                 }
                 else if (needsProcessing && ffmpegPath == null)
                 {
-                    if (debugMode) Console.WriteLine($"  Warning: ffmpeg not found, cannot resample/convert to mono");
+                    if (debugMode) Console.WriteLine($"  ffmpeg not found");
                 }
                 
-                if (debugMode) Console.WriteLine("[10%] Reading WAV file...");
+                if (debugMode) Console.WriteLine("[10%] Reading WAV...");
                 
                 byte[] fileBytes = File.ReadAllBytes(actualInputPath);
                 
@@ -192,7 +191,7 @@ namespace RGHAudioConverter
                     
                     if (chunkSize < 0 || pos + 8 + chunkSize > fileBytes.Length)
                     {
-                        if (debugMode) Console.WriteLine($"  Warning: Invalid chunk '{chunkId}' size {chunkSize}");
+                        if (debugMode) Console.WriteLine($"  Bad chunk '{chunkId}' size {chunkSize}");
                         break;
                     }
 
@@ -247,7 +246,7 @@ namespace RGHAudioConverter
 
                 if (channels == 1)
                 {
-                    if (debugMode) Console.WriteLine("  Encoding mono...");
+                    if (debugMode) Console.WriteLine("  Mono");
                     dspData = EncodeDspData(samples, progressCallback, 20, 90);
                 }
                 else
@@ -261,10 +260,10 @@ namespace RGHAudioConverter
                         rightSamples[i] = samples[i * 2 + 1];
                     }
 
-                    if (debugMode) Console.WriteLine("  Encoding left channel...");
+                    if (debugMode) Console.WriteLine("  Left channel...");
                     byte[] leftEncoded = EncodeDspData(leftSamples, progressCallback, 20, 55);
                     
-                    if (debugMode) Console.WriteLine("  Encoding right channel...");
+                    if (debugMode) Console.WriteLine("  Right channel...");
                     byte[] rightEncoded = EncodeDspData(rightSamples, progressCallback, 55, 90);
                     
                     if (debugMode) Console.WriteLine("  Interleaving...");
@@ -339,7 +338,7 @@ namespace RGHAudioConverter
                         frameSamples[i] = 0;
                 }
 
-                // Try each coefficient and find the one with lowest error
+                // try each coef, pick lowest error
                 int bestCoef = 0;
                 int bestScale = 0;
                 long bestTotalError = long.MaxValue;
@@ -352,7 +351,7 @@ namespace RGHAudioConverter
                     int c1 = DSP_COEFS[coefIdx * 2];
                     int c2 = DSP_COEFS[coefIdx * 2 + 1];
 
-                    // Calculate residuals to find max for scale
+                    // get max residual for scale
                     int th1 = hist1, th2 = hist2;
                     int maxResidual = 0;
                     
@@ -366,14 +365,14 @@ namespace RGHAudioConverter
                         th1 = frameSamples[i];
                     }
 
-                    // Find optimal scale (need to fit residuals in -8 to 7 range)
+                    // find scale that fits -8 to 7
                     int scale = 0;
                     while (scale < 12 && maxResidual > ((1 << scale) * 8 - 1))
                         scale++;
 
                     int scaleFactor = 1 << scale;
 
-                    // Encode with feedback and calculate total error
+                    // encode and get error
                     int[] testNibbles = new int[14];
                     int testH1 = hist1, testH2 = hist2;
                     long totalError = 0;
@@ -383,18 +382,15 @@ namespace RGHAudioConverter
                         int pred = (c1 * testH1 + c2 * testH2 + 1024) >> 11;
                         int residual = frameSamples[i] - pred;
 
-                        // Quantize residual to nibble
                         int nibble = (residual + (scaleFactor >> 1)) / scaleFactor;
                         nibble = Math.Clamp(nibble, -8, 7);
                         testNibbles[i] = nibble & 0xF;
 
-                        // Decode to get actual reconstructed sample
                         int signedNibble = nibble >= 8 ? nibble - 16 : nibble;
                         int decoded = signedNibble * scaleFactor;
                         decoded = ((decoded << 11) + 1024 + c1 * testH1 + c2 * testH2) >> 11;
                         decoded = Math.Clamp(decoded, -32768, 32767);
 
-                        // Track error
                         int err = frameSamples[i] - decoded;
                         totalError += (long)err * err;
 
@@ -413,7 +409,7 @@ namespace RGHAudioConverter
                     }
                 }
 
-                // Write the frame
+                // write frame
                 result[frameOffset] = (byte)((bestCoef << 4) | bestScale);
                 
                 for (int i = 0; i < 7; i++)
@@ -421,7 +417,6 @@ namespace RGHAudioConverter
                     result[frameOffset + 1 + i] = (byte)((bestNibbles[i * 2] << 4) | bestNibbles[i * 2 + 1]);
                 }
 
-                // Update history with best results
                 hist1 = bestHist1;
                 hist2 = bestHist2;
 
@@ -514,11 +509,11 @@ namespace RGHAudioConverter
                 if (debugMode)
                 {
                     AllocConsole();
-                    Console.WriteLine("=== RGH Audio Converter - OGG Encoding ===");
+                    Console.WriteLine("=== RGH Audio Converter - OGG ===");
                     Console.WriteLine($"Input: {inputPath}");
                     Console.WriteLine($"Output: {outputPath}");
-                    Console.WriteLine($"Target Sample Rate: {targetSampleRate}Hz");
-                    Console.WriteLine($"Force Mono: {forceMono}");
+                    Console.WriteLine($"Sample Rate: {targetSampleRate}Hz");
+                    Console.WriteLine($"Mono: {forceMono}");
                     Console.WriteLine();
                 }
 
@@ -539,7 +534,7 @@ namespace RGHAudioConverter
                 if (oggencPath == null)
                     return "oggenc2.exe not found! Place it in the same folder as this application.";
 
-                // Check input sample rate and channels
+                // get input info
                 byte[] checkBytes = File.ReadAllBytes(inputPath);
                 int inputSampleRate = 0;
                 int inputChannels = 0;
@@ -565,7 +560,7 @@ namespace RGHAudioConverter
                 
                 if (needsProcessing)
                 {
-                    if (debugMode) Console.WriteLine($"[5%] Processing audio (resample/mono)...");
+                    if (debugMode) Console.WriteLine($"[5%] Resampling/converting...");
                     progressCallback?.Invoke(5);
                     
                     tempProcessedFile = Path.Combine(Path.GetTempPath(), $"rgh_process_{Guid.NewGuid():N}.wav");
@@ -580,11 +575,11 @@ namespace RGHAudioConverter
                     if (result == 0 && File.Exists(tempProcessedFile))
                     {
                         actualInputPath = tempProcessedFile;
-                        if (debugMode) Console.WriteLine($"  Processed successfully");
+                        if (debugMode) Console.WriteLine($"  Done");
                     }
                     else
                     {
-                        if (debugMode) Console.WriteLine($"  Warning: Processing failed, using original");
+                        if (debugMode) Console.WriteLine($"  Failed, using original");
                     }
                 }
 
@@ -630,7 +625,7 @@ namespace RGHAudioConverter
                         string monoWav = Path.Combine(tempDir, $"ch{ch}.wav");
                         string monoOgg = Path.Combine(tempDir, $"ch{ch}.ogg");
 
-                        if (debugMode) Console.WriteLine($"[{10 + (ch * 30 / channels)}%] Extracting channel {ch}...");
+                        if (debugMode) Console.WriteLine($"[{10 + (ch * 30 / channels)}%] Channel {ch}...");
 
                         var ffmpegResult = RunProcess(ffmpegPath, 
                             $"-y -i \"{actualInputPath}\" -filter_complex \"[0:a]pan=mono|c0=c{ch}[a]\" -map \"[a]\" \"{monoWav}\"",
@@ -641,7 +636,7 @@ namespace RGHAudioConverter
 
                         progressCallback?.Invoke(20 + (ch * 30 / channels));
 
-                        if (debugMode) Console.WriteLine($"[{20 + (ch * 30 / channels)}%] Encoding channel {ch}...");
+                        if (debugMode) Console.WriteLine($"[{20 + (ch * 30 / channels)}%] Encoding ch{ch}...");
 
                         var oggResult = RunProcess(oggencPath,
                             $"-q 6 --comment \"ENCODER=SLib_encoder\" -o \"{monoOgg}\" \"{monoWav}\"",
@@ -652,7 +647,7 @@ namespace RGHAudioConverter
 
                         oggData[ch] = File.ReadAllBytes(monoOgg);
                         
-                        if (debugMode) Console.WriteLine($"  Channel {ch}: {oggData[ch].Length} bytes");
+                        if (debugMode) Console.WriteLine($"  ch{ch}: {oggData[ch].Length} bytes");
                     }
 
                     progressCallback?.Invoke(70);
