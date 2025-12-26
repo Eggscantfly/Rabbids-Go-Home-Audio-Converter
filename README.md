@@ -14,6 +14,6 @@ This tool could possibly be used for other LyN Engine Titles e.g. (Rabbids Trave
 
 ## Credits
 
-Shoutout to vgmstream for Reverse Engineering this file format and figuring out the DSP coefficients and other things!. Without them this tool wouldnt exist.
+Shoutout to vgmstream for Reverse Engineering this file format and figuring out the DSP coefficients and other things! Without them this tool wouldnt exist.
 
 https://github.com/vgmstream/vgmstream
