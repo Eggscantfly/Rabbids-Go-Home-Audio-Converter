@@ -13,7 +13,6 @@ This tool converts standard 16-bit WAV files into Ubisoft's LyN **.sns** format.
 This tool could possibly be used for other LyN Engine Titles e.g. (Rabbids Travel in Time, Rabbids Land, Just Dance 2, Zombie U ect. )
 
 ## Downsides
-Sadly there's no way to generate a sns file that has the Label string with the beat markers in them yet...  
 If you want to replace a sns e.g. (**A Stereo sns with the Sample Rate of 32000hz**) Your custom audio has to have the same Sample Rate and the same amount of Channels as the sns you are trying to replace.
 
 ## Credits
