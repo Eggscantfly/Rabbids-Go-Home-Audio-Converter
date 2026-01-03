@@ -1,316 +1,410 @@
-<Window x:Class="RGHAudioConverter.MainWindow"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Rabbids Go Home Audio Converter"
-        Height="600" Width="800"
-        WindowStartupLocation="CenterScreen"
-        ResizeMode="NoResize"
-        Background="#FF808080">
-    
-    <Window.Resources>
-        
-        <!-- Button Style -->
-        <Style x:Key="PlatformButtonStyle" TargetType="Button">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderBrush" Value="#CCCCCC"/>
-            <Setter Property="BorderThickness" Value="3"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="border" 
-                                Background="{TemplateBinding Background}" 
-                                BorderBrush="{TemplateBinding BorderBrush}" 
-                                BorderThickness="{TemplateBinding BorderThickness}">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="border" Property="BorderBrush" Value="White"/>
-                                <Setter TargetName="border" Property="Background" Value="#20FFFFFF"/>
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="border" Property="Background" Value="#40FFFFFF"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-        
-        <!-- OK Button Style -->
-        <Style x:Key="OkButtonStyle" TargetType="Button">
-            <Setter Property="Background" Value="White"/>
-            <Setter Property="BorderBrush" Value="Black"/>
-            <Setter Property="BorderThickness" Value="2"/>
-            <Setter Property="FontSize" Value="18"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Padding" Value="30,5"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="border" 
-                                Background="{TemplateBinding Background}" 
-                                BorderBrush="{TemplateBinding BorderBrush}" 
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="border" Property="Background" Value="#EEEEEE"/>
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="border" Property="Background" Value="#DDDDDD"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-    </Window.Resources>
-    
-    <Grid>
-        <!-- Main Content -->
-        <Grid x:Name="MainContent">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-                <RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
+using System;
+using System.Diagnostics;
+using System.IO;
+using System.Windows;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Threading.Tasks;
+using Microsoft.Win32;
+
+namespace RGHAudioConverter
+{
+    public partial class MainWindow : Window
+    {
+        private readonly Random _random = new Random();
+        private readonly string[] _failedImages = 
+        {
+            "Contents/Gui/Icons/Rabbid_Failed.png",
+            "Contents/Gui/Icons/Rabbid_Failed_2.png",
+            "Contents/Gui/Icons/Rabbid_Failed_3.png"
+        };
+        private const string SuccessImage = "Contents/Gui/Icons/Rabbid_Success.png";
+        private readonly string _baseDir;
+        private FontFamily? _rabbidsFont;
+
+        public MainWindow()
+        {
+            InitializeComponent();
             
-            <!-- Logo at top -->
-            <Image x:Name="LogoImage" 
-                   Grid.Row="0"
-                   Height="200"
-                   Margin="0,40,0,20"
-                   RenderOptions.BitmapScalingMode="HighQuality"/>
+            _baseDir = AppDomain.CurrentDomain.BaseDirectory;
             
-            <!-- Platform Selection Buttons -->
-            <Grid Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="250"/>
-                    <ColumnDefinition Width="80"/>
-                    <ColumnDefinition Width="250"/>
-                </Grid.ColumnDefinitions>
+            // load font
+            LoadCustomFont();
+            
+            // load images
+            LoadImages();
+            
+            // init 4ch checkbox
+            UpdateFourChannelCheckboxState();
+        }
+
+        private void LoadCustomFont()
+        {
+            try
+            {
+                string fontDir = Path.Combine(_baseDir, "Contents", "Font");
+                if (Directory.Exists(fontDir))
+                {
+                    _rabbidsFont = new FontFamily(new Uri(fontDir + "/"), "./#Rabbids_go_home");
+                    
+                    this.FontFamily = _rabbidsFont;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Font loading failed: {ex.Message}");
+            }
+        }
+
+        private void LoadImages()
+        {
+            try
+            {
+                // load logo
+                string logoPath = Path.Combine(_baseDir, "Contents", "Gui", "RGH logo", "RGHAC.png");
+                if (File.Exists(logoPath))
+                    LogoImage.Source = LoadBitmapImage(logoPath);
+
+                // NGC button
+                string ngcPath = Path.Combine(_baseDir, "Contents", "Gui", "NGC", "NGC.png");
+                if (File.Exists(ngcPath))
+                    NgcImage.Source = LoadBitmapImage(ngcPath);
+
+                // OGG button
+                string oggPath = Path.Combine(_baseDir, "Contents", "Gui", "OGG", "OGGFish.png");
+                if (File.Exists(oggPath))
+                    OggImage.Source = LoadBitmapImage(oggPath);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error loading images: {ex.Message}", "Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
+        private BitmapImage? LoadBitmapImage(string path)
+        {
+            try
+            {
+                if (File.Exists(path))
+                {
+                    var bitmap = new BitmapImage();
+                    bitmap.BeginInit();
+                    bitmap.UriSource = new Uri(path);
+                    bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                    bitmap.EndInit();
+                    return bitmap;
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        private BitmapImage? LoadImage(string relativePath)
+        {
+            string fullPath = Path.Combine(_baseDir, relativePath);
+            return LoadBitmapImage(fullPath);
+        }
+
+        private async void NgcButton_Click(object sender, RoutedEventArgs e)
+        {
+            await ConvertAudio(CodecType.DSP);
+        }
+
+        private async void OggButton_Click(object sender, RoutedEventArgs e)
+        {
+            await ConvertAudio(CodecType.OGG);
+        }
+
+        private void UpdateProgress(int percent)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                StatusText.Text = $"Encoding... {percent}%";
+            });
+        }
+
+        private bool IsDebugMode => DebugCheckbox.IsChecked == true;
+        private bool IsNormalize => NormalizeCheckbox.IsChecked == true;
+        private bool IsFourChannel => FourChannelCheckbox.IsChecked == true && FourChannelCheckbox.IsEnabled;
+
+        private int GetSelectedSampleRate()
+        {
+            if (SampleRateCombo.SelectedItem is System.Windows.Controls.ComboBoxItem item)
+            {
+                if (int.TryParse(item.Content.ToString(), out int rate))
+                    return rate;
+            }
+            return 32000;
+        }
+
+        private OutputFormat GetSelectedFormat()
+        {
+            return FormatCombo.SelectedIndex == 1 ? OutputFormat.SON : OutputFormat.SNS;
+        }
+
+        private string GetFileExtension()
+        {
+            return GetSelectedFormat() == OutputFormat.SON ? ".son" : ".sns";
+        }
+
+        private ExtrasOption GetSelectedExtras()
+        {
+            return ExtrasCombo.SelectedIndex switch
+            {
+                1 => ExtrasOption.JustDance,
+                2 => ExtrasOption.CustomBeats,
+                _ => ExtrasOption.None
+            };
+        }
+
+        private void FormatCombo_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        {
+            UpdateFourChannelCheckboxState();
+        }
+
+        private void UpdateFourChannelCheckboxState()
+        {
+            if (FourChannelCheckbox != null)
+            {
+                // 4ch only for SON
+                bool isRabbidsLand = FormatCombo.SelectedIndex == 1;
+                FourChannelCheckbox.IsEnabled = isRabbidsLand;
                 
-                <!-- Wii/NGC Button (DSP) -->
-                <Button x:Name="NgcButton" 
-                        Grid.Column="0"
-                        Style="{StaticResource PlatformButtonStyle}"
-                        Width="220" Height="180"
-                        Click="NgcButton_Click"
-                        ToolTip="Nintendo GameCube/Wii - DSP ADPCM">
-                    <Image x:Name="NgcImage"
-                           Stretch="Uniform" 
-                           Margin="10"
-                           RenderOptions.BitmapScalingMode="HighQuality"/>
-                </Button>
+                // uncheck if disabled
+                if (!isRabbidsLand)
+                {
+                    FourChannelCheckbox.IsChecked = false;
+                }
+            }
+        }
+
+        private async Task ConvertAudio(CodecType codec)
+        {
+            var openDialog = new OpenFileDialog
+            {
+                Title = "Select WAV File",
+                Filter = "WAV files (*.wav)|*.wav|All files (*.*)|*.*"
+            };
+
+            if (openDialog.ShowDialog() != true)
+                return;
+
+            string inputPath = openDialog.FileName;
+
+            if (!LynEncoder.ValidateWavFile(inputPath, out string validationError))
+            {
+                ShowResult(false, validationError);
+                return;
+            }
+
+            string ext = GetFileExtension();
+            string formatName = GetSelectedFormat() == OutputFormat.SON ? "SON" : "SNS";
+
+            var saveDialog = new SaveFileDialog
+            {
+                Title = $"Save {formatName} File",
+                Filter = $"{formatName} files (*{ext})|*{ext}|All files (*.*)|*.*",
+                FileName = Path.GetFileNameWithoutExtension(inputPath) + ext
+            };
+
+            if (saveDialog.ShowDialog() != true)
+                return;
+
+            string outputPath = saveDialog.FileName;
+
+            SetButtonsEnabled(false);
+            StatusText.Text = "Encoding... 0%";
+
+            bool debugMode = IsDebugMode;
+            bool normalize = IsNormalize;
+            bool fourChannel = IsFourChannel;
+            int targetSampleRate = GetSelectedSampleRate();
+            bool forceMono = MonoCheckbox.IsChecked == true;
+            OutputFormat format = GetSelectedFormat();
+            ExtrasOption extras = GetSelectedExtras();
+
+            try
+            {
+                string? error = null;
+
+                await Task.Run(() =>
+                {
+                    if (codec == CodecType.DSP)
+                    {
+                        error = LynEncoder.ConvertWavToDspSns(inputPath, outputPath, UpdateProgress, debugMode, targetSampleRate, forceMono, format, normalize, fourChannel, extras);
+                    }
+                    else
+                    {
+                        error = LynEncoder.ConvertWavToOggSns(inputPath, outputPath, UpdateProgress, debugMode, targetSampleRate, forceMono, format, normalize, extras);
+                    }
+                });
+
+                if (string.IsNullOrEmpty(error))
+                {
+                    ShowResult(true, $"{formatName} Successfully\nGenerated!");
+                }
+                else
+                {
+                    ShowResult(false, $"{formatName} Failed!\n\n{error}");
+                }
+            }
+            catch (Exception ex)
+            {
+                ShowResult(false, $"{formatName} Failed!\n\n{ex.Message}");
+            }
+            finally
+            {
+                SetButtonsEnabled(true);
+                StatusText.Text = "";
                 
-                <!-- OGG/PC Button -->
-                <Button x:Name="OggButton" 
-                        Grid.Column="2"
-                        Style="{StaticResource PlatformButtonStyle}"
-                        Width="220" Height="180"
-                        Click="OggButton_Click"
-                        ToolTip="PC - OGG Vorbis">
-                    <Image x:Name="OggImage"
-                           Stretch="Uniform" 
-                           Margin="10"
-                           RenderOptions.BitmapScalingMode="HighQuality"/>
-                </Button>
-            </Grid>
-            
-            <!-- Bottom area with status and debug checkbox -->
-            <Grid Grid.Row="2" Margin="0,0,0,15">
-                <!-- Credits Button and Options (bottom left) -->
-                <StackPanel Orientation="Horizontal"
-                            HorizontalAlignment="Left"
-                            VerticalAlignment="Center"
-                            Margin="20,0,0,0">
-                    <Button x:Name="CreditsButton"
-                            Padding="10,5"
-                            Background="Transparent"
-                            Foreground="White"
-                            BorderBrush="White"
-                            BorderThickness="1"
-                            Content="Credits"
-                            FontSize="12"
-                            Cursor="Hand"
-                            Click="CreditsButton_Click"/>
-                    <CheckBox x:Name="MonoCheckbox"
-                              Foreground="White"
-                              Content="Mono"
-                              FontSize="12"
-                              VerticalAlignment="Center"
-                              Margin="15,0,0,0"/>
-                    <ComboBox x:Name="SampleRateCombo" 
-                              Width="70" 
-                              FontSize="11"
-                              SelectedIndex="4"
-                              Margin="10,0,0,0">
-                        <ComboBoxItem Content="8000"/>
-                        <ComboBoxItem Content="11025"/>
-                        <ComboBoxItem Content="16000"/>
-                        <ComboBoxItem Content="22050"/>
-                        <ComboBoxItem Content="32000"/>
-                    </ComboBox>
-                    <TextBlock Text="Hz" 
-                               Foreground="White" 
-                               FontSize="12" 
-                               VerticalAlignment="Center"
-                               Margin="5,0,0,0"/>
-                </StackPanel>
+                // clear beat stealer after conversion
+                if (LynEncoder.HasCustomBeats)
+                {
+                    LynEncoder.ClearCustomBeats();
+                    Dispatcher.Invoke(() =>
+                    {
+                        BeatStealerPath.Text = "No file selected";
+                        BeatStealerPath.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.Gray);
+                        BeatStealerStatus.Text = "";
+                        if (ExtrasCombo.SelectedIndex == 2)
+                        {
+                            ExtrasCombo.SelectedIndex = 0;
+                        }
+                    });
+                }
+            }
+        }
+
+        private void SetButtonsEnabled(bool enabled)
+        {
+            NgcButton.IsEnabled = enabled;
+            OggButton.IsEnabled = enabled;
+            OptionsButton.IsEnabled = enabled;
+        }
+
+        private void ShowResult(bool success, string message)
+        {
+            // set rabbid image
+            string imagePath;
+            if (success)
+            {
+                imagePath = SuccessImage;
+            }
+            else
+            {
+                // random fail image
+                imagePath = _failedImages[_random.Next(_failedImages.Length)];
+            }
+
+            RabbidImage.Source = LoadImage(imagePath);
+
+            // set message
+            ResultMessage.Text = message;
+
+            // show overlay
+            ResultOverlay.Visibility = Visibility.Visible;
+        }
+
+        private void OkButton_Click(object sender, RoutedEventArgs e)
+        {
+            ResultOverlay.Visibility = Visibility.Collapsed;
+        }
+
+        private void CreditsButton_Click(object sender, RoutedEventArgs e)
+        {
+            CreditsOverlay.Visibility = Visibility.Visible;
+        }
+
+        private void CloseCredits_Click(object sender, RoutedEventArgs e)
+        {
+            CreditsOverlay.Visibility = Visibility.Collapsed;
+        }
+
+        private void CreditsOverlay_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            CreditsOverlay.Visibility = Visibility.Collapsed;
+        }
+
+        private void OptionsButton_Click(object sender, RoutedEventArgs e)
+        {
+            OptionsOverlay.Visibility = Visibility.Visible;
+        }
+
+        private void CloseOptions_Click(object sender, RoutedEventArgs e)
+        {
+            OptionsOverlay.Visibility = Visibility.Collapsed;
+        }
+
+        private void OptionsOverlay_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            OptionsOverlay.Visibility = Visibility.Collapsed;
+        }
+
+        private void BeatStealerBrowse_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new Microsoft.Win32.OpenFileDialog
+            {
+                Filter = "SNS Files (*.sns)|*.sns|All Files (*.*)|*.*",
+                Title = "Select Original SNS File to Extract Beats From"
+            };
+
+            if (dialog.ShowDialog() == true)
+            {
+                int beatCount = LynEncoder.ExtractBeatsFromSns(dialog.FileName);
                 
-                <!-- Status Text (center) -->
-                <TextBlock x:Name="StatusText"
-                           HorizontalAlignment="Center"
-                           VerticalAlignment="Center"
-                           FontSize="20"
-                           Foreground="White"
-                           Text=""/>
-                
-                <!-- Debug Terminal Checkbox (bottom right) -->
-                <CheckBox x:Name="DebugCheckbox"
-                          HorizontalAlignment="Right"
-                          VerticalAlignment="Center"
-                          Margin="0,0,20,0"
-                          Foreground="White"
-                          Content="Debug Terminal"
-                          FontSize="12"/>
-            </Grid>
-        </Grid>
-        
-        <!-- Result Dialog Overlay (Hidden by default) - Smaller popup style -->
-        <Grid x:Name="ResultOverlay" Visibility="Collapsed">
-            <!-- Semi-transparent background -->
-            <Rectangle Fill="#80000000"/>
+                if (beatCount > 0)
+                {
+                    BeatStealerPath.Text = System.IO.Path.GetFileName(dialog.FileName);
+                    BeatStealerPath.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.White);
+                    BeatStealerStatus.Text = $"✓ Beat labels found: {beatCount} beats";
+                    BeatStealerStatus.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(76, 175, 80)); // green
+                    
+                    // auto-select custom beats
+                    ExtrasCombo.SelectedIndex = 2;
+                }
+                else
+                {
+                    BeatStealerPath.Text = System.IO.Path.GetFileName(dialog.FileName);
+                    BeatStealerPath.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.Gray);
+                    BeatStealerStatus.Text = "✗ No beat labels found";
+                    BeatStealerStatus.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(244, 67, 54)); // red
+                }
+            }
+        }
+
+        private void BeatStealerClear_Click(object sender, RoutedEventArgs e)
+        {
+            LynEncoder.ClearCustomBeats();
+            BeatStealerPath.Text = "No file selected";
+            BeatStealerPath.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.Gray);
+            BeatStealerStatus.Text = "";
             
-            <!-- Popup box -->
-            <Border Background="White" 
-                    BorderBrush="Black" 
-                    BorderThickness="3"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Center"
-                    CornerRadius="5"
-                    MinWidth="450"
-                    MinHeight="180"
-                    MaxWidth="500">
-                <Grid Margin="15">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="130"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-                    
-                    <!-- Rabbid Face -->
-                    <Image x:Name="RabbidImage"
-                           Grid.Column="0"
-                           Grid.Row="0"
-                           Width="110"
-                           Height="110"
-                           Margin="5"
-                           VerticalAlignment="Center"
-                           HorizontalAlignment="Center"
-                           RenderOptions.BitmapScalingMode="HighQuality"/>
-                    
-                    <!-- Result Message -->
-                    <TextBlock x:Name="ResultMessage"
-                               Grid.Column="1"
-                               Grid.Row="0"
-                               VerticalAlignment="Center"
-                               HorizontalAlignment="Left"
-                               FontSize="24"
-                               FontWeight="Bold"
-                               TextWrapping="Wrap"
-                               Margin="10,0,0,0"/>
-                    
-                    <!-- OK Button -->
-                    <Button x:Name="OkButton"
-                            Grid.Column="1"
-                            Grid.Row="1"
-                            Style="{StaticResource OkButtonStyle}"
-                            HorizontalAlignment="Right"
-                            Margin="0,10,0,0"
-                            Content="OK"
-                            Click="OkButton_Click"/>
-                </Grid>
-            </Border>
-        </Grid>
-        
-        <!-- Credits Overlay -->
-        <Grid x:Name="CreditsOverlay" Visibility="Collapsed">
-            <Rectangle Fill="#80000000" MouseDown="CreditsOverlay_MouseDown"/>
-            
-            <Border Background="White" 
-                    BorderBrush="Black" 
-                    BorderThickness="3"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Center"
-                    CornerRadius="5"
-                    Padding="25">
-                <StackPanel>
-                    <TextBlock x:Name="CreditsTitleText"
-                               Text="Credits"
-                               FontSize="28"
-                               FontWeight="Bold"
-                               HorizontalAlignment="Center"
-                               Margin="0,0,0,20"/>
-                    
-                    <TextBlock x:Name="MadeByText"
-                               Text="Made by"
-                               FontSize="14"
-                               Foreground="Gray"
-                               HorizontalAlignment="Center"/>
-                    <TextBlock x:Name="EggsLink"
-                               Text="Eggscantfly"
-                               FontSize="20"
-                               FontWeight="Bold"
-                               Foreground="Blue"
-                               TextDecorations="Underline"
-                               HorizontalAlignment="Center"
-                               Cursor="Hand"
-                               Margin="0,0,0,20"
-                               MouseDown="EggsLink_Click"/>
-                    
-                    <TextBlock x:Name="SpecialThanksText"
-                               Text="Special Thanks"
-                               FontSize="14"
-                               Foreground="Gray"
-                               HorizontalAlignment="Center"
-                               Margin="0,10,0,5"/>
-                    
-                    <TextBlock x:Name="SkibidiLink"
-                               Text="Skibidi_Sigma"
-                               FontSize="18"
-                               Foreground="Blue"
-                               TextDecorations="Underline"
-                               HorizontalAlignment="Center"
-                               Cursor="Hand"
-                               Margin="0,5,0,5"
-                               MouseDown="SkibidiLink_Click"/>
-                    
-                    <TextBlock x:Name="CruwbyLink"
-                               Text="Cruwby"
-                               FontSize="18"
-                               Foreground="Blue"
-                               TextDecorations="Underline"
-                               HorizontalAlignment="Center"
-                               Cursor="Hand"
-                               Margin="0,5,0,20"
-                               MouseDown="CruwbyLink_Click"/>
-                    
-                    <Button x:Name="CloseCreditsButton"
-                            Content="Close"
-                            Padding="20,8"
-                            HorizontalAlignment="Center"
-                            Click="CloseCredits_Click"/>
-                </StackPanel>
-            </Border>
-        </Grid>
-    </Grid>
-</Window>
+            // reset if custom beats was selected
+            if (ExtrasCombo.SelectedIndex == 2)
+            {
+                ExtrasCombo.SelectedIndex = 0;
+            }
+        }
+
+        private void EggsLink_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            Process.Start(new ProcessStartInfo("https://www.youtube.com/@EggsCantFly") { UseShellExecute = true });
+        }
+
+        private void SkibidiLink_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            Process.Start(new ProcessStartInfo("https://www.youtube.com/@Skibidisigma-s5y") { UseShellExecute = true });
+        }
+
+        private void CruwbyLink_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            Process.Start(new ProcessStartInfo("https://www.youtube.com/@Cruwby") { UseShellExecute = true });
+        }
+    }
+
+    public enum CodecType
+    {
+        DSP,
+        OGG
+    }
+}
