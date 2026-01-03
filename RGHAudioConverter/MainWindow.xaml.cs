@@ -28,11 +28,14 @@ namespace RGHAudioConverter
             
             _baseDir = AppDomain.CurrentDomain.BaseDirectory;
             
-            // Load custom font
+            // load font
             LoadCustomFont();
             
-            // Load images at startup
+            // load images
             LoadImages();
+            
+            // init 4ch checkbox
+            UpdateFourChannelCheckboxState();
         }
 
         private void LoadCustomFont()
@@ -57,17 +60,17 @@ namespace RGHAudioConverter
         {
             try
             {
-                // Load logo
+                // load logo
                 string logoPath = Path.Combine(_baseDir, "Contents", "Gui", "RGH logo", "RGHAC.png");
                 if (File.Exists(logoPath))
                     LogoImage.Source = LoadBitmapImage(logoPath);
 
-                // Load NGC button image
+                // NGC button
                 string ngcPath = Path.Combine(_baseDir, "Contents", "Gui", "NGC", "NGC.png");
                 if (File.Exists(ngcPath))
                     NgcImage.Source = LoadBitmapImage(ngcPath);
 
-                // Load OGG button image
+                // OGG button
                 string oggPath = Path.Combine(_baseDir, "Contents", "Gui", "OGG", "OGGFish.png");
                 if (File.Exists(oggPath))
                     OggImage.Source = LoadBitmapImage(oggPath);
@@ -121,10 +124,62 @@ namespace RGHAudioConverter
         }
 
         private bool IsDebugMode => DebugCheckbox.IsChecked == true;
+        private bool IsNormalize => NormalizeCheckbox.IsChecked == true;
+        private bool IsFourChannel => FourChannelCheckbox.IsChecked == true && FourChannelCheckbox.IsEnabled;
+
+        private int GetSelectedSampleRate()
+        {
+            if (SampleRateCombo.SelectedItem is System.Windows.Controls.ComboBoxItem item)
+            {
+                if (int.TryParse(item.Content.ToString(), out int rate))
+                    return rate;
+            }
+            return 32000;
+        }
+
+        private OutputFormat GetSelectedFormat()
+        {
+            return FormatCombo.SelectedIndex == 1 ? OutputFormat.SON : OutputFormat.SNS;
+        }
+
+        private string GetFileExtension()
+        {
+            return GetSelectedFormat() == OutputFormat.SON ? ".son" : ".sns";
+        }
+
+        private ExtrasOption GetSelectedExtras()
+        {
+            return ExtrasCombo.SelectedIndex switch
+            {
+                1 => ExtrasOption.JustDance,
+                2 => ExtrasOption.CustomBeats,
+                _ => ExtrasOption.None
+            };
+        }
+
+        private void FormatCombo_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        {
+            UpdateFourChannelCheckboxState();
+        }
+
+        private void UpdateFourChannelCheckboxState()
+        {
+            if (FourChannelCheckbox != null)
+            {
+                // 4ch only for SON
+                bool isRabbidsLand = FormatCombo.SelectedIndex == 1;
+                FourChannelCheckbox.IsEnabled = isRabbidsLand;
+                
+                // uncheck if disabled
+                if (!isRabbidsLand)
+                {
+                    FourChannelCheckbox.IsChecked = false;
+                }
+            }
+        }
 
         private async Task ConvertAudio(CodecType codec)
         {
-            // Open file dialog for WAV
             var openDialog = new OpenFileDialog
             {
                 Title = "Select WAV File",
@@ -136,19 +191,20 @@ namespace RGHAudioConverter
 
             string inputPath = openDialog.FileName;
 
-            // Validate WAV file
             if (!LynEncoder.ValidateWavFile(inputPath, out string validationError))
             {
                 ShowResult(false, validationError);
                 return;
             }
 
-            // Save file dialog for SNS
+            string ext = GetFileExtension();
+            string formatName = GetSelectedFormat() == OutputFormat.SON ? "SON" : "SNS";
+
             var saveDialog = new SaveFileDialog
             {
-                Title = "Save SNS File",
-                Filter = "SNS files (*.sns)|*.sns|All files (*.*)|*.*",
-                FileName = Path.GetFileNameWithoutExtension(inputPath) + ".sns"
+                Title = $"Save {formatName} File",
+                Filter = $"{formatName} files (*{ext})|*{ext}|All files (*.*)|*.*",
+                FileName = Path.GetFileNameWithoutExtension(inputPath) + ext
             };
 
             if (saveDialog.ShowDialog() != true)
@@ -156,11 +212,16 @@ namespace RGHAudioConverter
 
             string outputPath = saveDialog.FileName;
 
-            // Disable buttons and show status
             SetButtonsEnabled(false);
             StatusText.Text = "Encoding... 0%";
 
             bool debugMode = IsDebugMode;
+            bool normalize = IsNormalize;
+            bool fourChannel = IsFourChannel;
+            int targetSampleRate = GetSelectedSampleRate();
+            bool forceMono = MonoCheckbox.IsChecked == true;
+            OutputFormat format = GetSelectedFormat();
+            ExtrasOption extras = GetSelectedExtras();
 
             try
             {
@@ -170,31 +231,47 @@ namespace RGHAudioConverter
                 {
                     if (codec == CodecType.DSP)
                     {
-                        error = LynEncoder.ConvertWavToDspSns(inputPath, outputPath, UpdateProgress, debugMode);
+                        error = LynEncoder.ConvertWavToDspSns(inputPath, outputPath, UpdateProgress, debugMode, targetSampleRate, forceMono, format, normalize, fourChannel, extras);
                     }
                     else
                     {
-                        error = LynEncoder.ConvertWavToOggSns(inputPath, outputPath, UpdateProgress, debugMode);
+                        error = LynEncoder.ConvertWavToOggSns(inputPath, outputPath, UpdateProgress, debugMode, targetSampleRate, forceMono, format, normalize, extras);
                     }
                 });
 
                 if (string.IsNullOrEmpty(error))
                 {
-                    ShowResult(true, "SNS Successfully\nGenerated!");
+                    ShowResult(true, $"{formatName} Successfully\nGenerated!");
                 }
                 else
                 {
-                    ShowResult(false, $"SNS Failed!\n\n{error}");
+                    ShowResult(false, $"{formatName} Failed!\n\n{error}");
                 }
             }
             catch (Exception ex)
             {
-                ShowResult(false, $"SNS Failed!\n\n{ex.Message}");
+                ShowResult(false, $"{formatName} Failed!\n\n{ex.Message}");
             }
             finally
             {
                 SetButtonsEnabled(true);
                 StatusText.Text = "";
+                
+                // clear beat stealer after conversion
+                if (LynEncoder.HasCustomBeats)
+                {
+                    LynEncoder.ClearCustomBeats();
+                    Dispatcher.Invoke(() =>
+                    {
+                        BeatStealerPath.Text = "No file selected";
+                        BeatStealerPath.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.Gray);
+                        BeatStealerStatus.Text = "";
+                        if (ExtrasCombo.SelectedIndex == 2)
+                        {
+                            ExtrasCombo.SelectedIndex = 0;
+                        }
+                    });
+                }
             }
         }
 
@@ -202,12 +279,12 @@ namespace RGHAudioConverter
         {
             NgcButton.IsEnabled = enabled;
             OggButton.IsEnabled = enabled;
-            DebugCheckbox.IsEnabled = enabled;
+            OptionsButton.IsEnabled = enabled;
         }
 
         private void ShowResult(bool success, string message)
         {
-            // Set the rabbid image
+            // set rabbid image
             string imagePath;
             if (success)
             {
@@ -215,16 +292,16 @@ namespace RGHAudioConverter
             }
             else
             {
-                // Random failed image
+                // random fail image
                 imagePath = _failedImages[_random.Next(_failedImages.Length)];
             }
 
             RabbidImage.Source = LoadImage(imagePath);
 
-            // Set message
+            // set message
             ResultMessage.Text = message;
 
-            // Show overlay
+            // show overlay
             ResultOverlay.Visibility = Visibility.Visible;
         }
 
@@ -246,6 +323,67 @@ namespace RGHAudioConverter
         private void CreditsOverlay_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
             CreditsOverlay.Visibility = Visibility.Collapsed;
+        }
+
+        private void OptionsButton_Click(object sender, RoutedEventArgs e)
+        {
+            OptionsOverlay.Visibility = Visibility.Visible;
+        }
+
+        private void CloseOptions_Click(object sender, RoutedEventArgs e)
+        {
+            OptionsOverlay.Visibility = Visibility.Collapsed;
+        }
+
+        private void OptionsOverlay_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            OptionsOverlay.Visibility = Visibility.Collapsed;
+        }
+
+        private void BeatStealerBrowse_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new Microsoft.Win32.OpenFileDialog
+            {
+                Filter = "SNS Files (*.sns)|*.sns|All Files (*.*)|*.*",
+                Title = "Select Original SNS File to Extract Beats From"
+            };
+
+            if (dialog.ShowDialog() == true)
+            {
+                int beatCount = LynEncoder.ExtractBeatsFromSns(dialog.FileName);
+                
+                if (beatCount > 0)
+                {
+                    BeatStealerPath.Text = System.IO.Path.GetFileName(dialog.FileName);
+                    BeatStealerPath.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.White);
+                    BeatStealerStatus.Text = $"✓ Beat labels found: {beatCount} beats";
+                    BeatStealerStatus.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(76, 175, 80)); // green
+                    
+                    // auto-select custom beats
+                    ExtrasCombo.SelectedIndex = 2;
+                }
+                else
+                {
+                    BeatStealerPath.Text = System.IO.Path.GetFileName(dialog.FileName);
+                    BeatStealerPath.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.Gray);
+                    BeatStealerStatus.Text = "✗ No beat labels found";
+                    BeatStealerStatus.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(244, 67, 54)); // red
+                }
+            }
+        }
+
+        private void BeatStealerClear_Click(object sender, RoutedEventArgs e)
+        {
+            LynEncoder.ClearCustomBeats();
+            BeatStealerPath.Text = "No file selected";
+            BeatStealerPath.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.Gray);
+            BeatStealerStatus.Text = "";
+            
+            // reset if custom beats was selected
+            if (ExtrasCombo.SelectedIndex == 2)
+            {
+                ExtrasCombo.SelectedIndex = 0;
+            }
         }
 
         private void EggsLink_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
